@@ -1,10 +1,10 @@
 from datetime import datetime
 
 from pydantic import AnyUrl as Url
-from nonebot_plugin_htmlrender import template_to_pic
 
 from .model import Character
 from .config import RES_DIR, TEMPLATES_DIR, config
+from .image_cache import cached_template_to_pic as template_to_pic
 from .schemas import (
     Clue,
     Status,
@@ -55,6 +55,9 @@ async def render_operator_roster(
         },
         device_scale_factor=1.5,
         screenshot_timeout=config.roster_render_timeout,
+        readiness="resources",
+        type=config.roster_render_format,
+        quality=config.roster_jpeg_quality if config.roster_render_format == "jpeg" else None,
     )
 
 

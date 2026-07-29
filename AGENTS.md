@@ -43,6 +43,8 @@ nonebot_plugin_skland/
 ├── model.py             # nonebot-plugin-orm 模型：SkUser、Character、GachaRecord
 ├── db_handler.py        # 数据库查询、更新、删除与抽卡记录存取函数
 ├── data_source.py       # 游戏数据下载、干员目录构建与本地元数据缓存
+├── player_data.py       # 玩家实时数据短期缓存：ArkCard TTL/LRU/single-flight
+├── image_cache.py       # 方舟半身图浏览器响应缓存与显式资源就绪等待
 ├── download.py          # GitHub 资源下载器与版本检查
 ├── render.py            # HTML 模板渲染为图片的函数
 ├── filters.py           # Jinja2 过滤器与可复用图片资源 URL 函数
@@ -168,14 +170,19 @@ class Config(BaseModel):
 - `github_proxy_url`: GitHub 代理 URL。
 - `github_token`: GitHub Token，用于缓解 GitHub API 限流。
 - `check_res_update`: 启动时是否检查并下载图片资源。
+- `ark_portrait_cache_enabled`: 是否在首次渲染时按需缓存可拼链的方舟干员/皮肤半身图，默认关闭。
 - `background_source`: 明日方舟/终末地卡片背景来源，支持 `default` / `Lolicon` / `random` / `CustomSource`。
 - `endfield_background_simple`: 是否默认启用终末地角色卡片简化背景。
 - `rogue_background_source`: 肉鸽背景来源，支持 `default` / `rogue` / `Lolicon` / `CustomSource`。
 - `argot_expire`: 暗语缓存过期时间（秒）。
+- `ark_card_cache_ttl`: 玩家角色卡内存缓存时间（秒），默认 120。
+- `ark_card_cache_max_entries`: 玩家角色卡内存缓存角色数量上限，默认 64。
 - `gacha_render_max`: 明日方舟抽卡记录单图渲染卡池上限。
 - `ef_gacha_render_max`: 终末地抽卡记录单图渲染各类别卡池上限。
 - `roster_render_max`: 方舟干员单图渲染数量上限，默认 16。
 - `roster_render_timeout`: 方舟干员传给 htmlrender 的截图超时时间（毫秒）。
+- `roster_render_format`: 方舟干员图片格式，支持 `png` / `jpeg`，默认 `jpeg`。
+- `roster_jpeg_quality`: 方舟干员 JPEG 质量，默认 90。
 
 资源路径：
 
@@ -249,6 +256,15 @@ class Config(BaseModel):
 - `UnauthorizedException` 通常表示 `cred_token` 失效，使用 `SklandLoginAPI.refresh_token(user.cred)` 刷新。
 - `LoginException` 通常表示 `cred` 失效，若有 `access_token`，通过 grant code 重新获取 cred。
 
+
+### 玩家角色卡短期缓存
+
+- `player_data.py` 的 `ArkCardDataSource` 为 `commands/card.py`、`commands/box.py` 和 `commands/gacha.py` 统一缓存无副作用的 `ArkCard` API 读取；`get_ark_card()` 在每个命令请求上下文独立执行 token 刷新。
+- 缓存按森空岛账号、应用、服务器、角色 UID 与 role ID 隔离，使用绝对 TTL、固定容量 LRU 和同角色 single-flight；命中不会延长过期时间。
+- 默认 TTL 为 120 秒、容量为 64，可通过 `ark_card_cache_ttl` 和 `ark_card_cache_max_entries` 配置；只缓存成功解析的 `ArkCard`，异常与空结果不缓存。
+- 三个命令在读取完成后、任何提前返回或渲染发送前提交 session，确保自动刷新的 `cred` / `cred_token` 不因后续空结果或发送失败而回滚。
+- 角色绑定同步或解绑后会失效对应用户的缓存；旧的并发请求完成后不会重新写入已失效代际。
+
 ### 游戏数据与资源
 
 `data_source.py`：
@@ -284,7 +300,8 @@ class Config(BaseModel):
 - 实装排序使用官方目录 `sort_id`，获取排序使用 `gainTime`；`all` 使用获取或练度排序时先排列已拥有干员，再将未拥有干员按实装顺序放在末尾。`unowned` 不允许潜能、获取或练度条件。
 - `schemas/arknights/game_data.py` 从官方数据构造稳定目录，并以 PRTS 快照补充职业分支中文名、性别和种族；阿米娅各职业形态保持独立身份。
 - `filters.py` 统一提供立绘、技能、潜能、精英阶段、职业、稀有度、模组及 Half 卡片装饰资源 URL。
-- `render.render_operator_roster()` 接收单个 `OperatorRoster`，固定 706px Playwright 视口、1.5 设备缩放和可配置截图超时。
+- `image_cache.py` 仅在 `ark_portrait_cache_enabled=True` 时登记 `char/portrait` 与 `char_skin/portrait` 拼链资源。首次 HTML 仍保留远程 URL，Chromium 正常并发加载；成功的 `requestfinished` 响应经校验后原子写入 `CACHE_DIR/portrait`，后续渲染由 URL helper 返回本地 URI。不会额外发起图片请求或重新生成 HTML，接口直接返回的图片 URL 不参与缓存。
+- `render.render_operator_roster()` 使用 `load`、`document.fonts.ready` 与图片 `decode()` 显式判断资源就绪，不再等待每页 `networkidle`；远程背景通过隐藏图片节点纳入等待。仍使用每页独立 BrowserContext、固定 706px Playwright 视口、1.5 设备缩放和可配置截图超时，默认输出 JPEG 90，可配置切回 PNG。
 - `operator_roster.html.jinja2` 维护 706px、4 列固定网格；筛选标签支持自动换行，样式编译到 `resources/templates/index.css`。
 
 终末地：
@@ -366,7 +383,8 @@ uv run pytest -s tests/test_skland_api.py
 - `tests/conftest.py` 使用 nonebug 初始化 NoneBot，并加载 `pyproject.toml` 中配置的插件。
 - 数据库测试使用内存 SQLite：`sqlite+aiosqlite://`。
 - `tests/test_ef_gacha_joint_pool.py` 覆盖终末地联合寻访分类、统计与模板渲染相关行为。
-- `tests/test_operator_roster.py` 覆盖官方目录与 PRTS 元数据合并、自然筛选词、高级参数合并、快捷指令空格约束、持有状态/潜能组合、实装/获取/练度排序、技能/模组组合、分页发送与渲染参数。
+- `tests/test_operator_roster.py` 覆盖官方目录与 PRTS 元数据合并、自然筛选词、高级参数合并、快捷指令空格约束、持有状态/潜能组合、实装/获取/练度排序、技能/模组组合、JPEG/PNG 参数、分页发送与渲染参数。
+- `tests/test_image_cache.py` 覆盖配置开关、单次模板生成、浏览器半身图响应落盘、本地复用、显式字体/图片就绪、等待超时、未知 URL 跳过与失败响应忽略。
 - `tests/test_skland_api.py` 会调用真实接口；单独运行时使用 `uv run pytest -s tests/test_skland_api.py`，其中 `-s` 用于显示终端二维码输出；凭证优先级为：
   1. `tests/cred_cache.json`
   2. 环境变量 `SKLAND_TOKEN` 或 `SKLAND_CRED`

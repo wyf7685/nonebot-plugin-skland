@@ -131,19 +131,24 @@ _✨ 通过森空岛查询游戏数据 ✨_
 |      `skland__github_proxy_url`      |  否   |    `""`     |              GitHub 代理 URL              |
 |        `skland__github_token`        |  否   |    `""`     |               GitHub Token                |
 |      `skland__check_res_update`      |  否   |   `False`   |         是否在启动时检查资源更新          |
+| `skland__ark_portrait_cache_enabled` |  否   |   `False`   |      是否按需缓存方舟干员半身图       |
 |     `skland__background_source`      |  否   | `"default"` |               背景图片来源                |
 | `skland__endfield_background_simple` |  否   |   `False`   |          终末地背景图片简化模式           |
 |  `skland__rogue_background_source`   |  否   |  `"rogue"`  |           肉鸽战绩背景图片来源            |
 |        `skland__argot_expire`        |  否   |    `300`    |          暗语消息过期时间（秒）           |
+|   `skland__ark_card_cache_ttl`    |  否   |    `120`    |       玩家角色卡短期缓存时间（秒）        |
+| `skland__ark_card_cache_max_entries` |  否   |    `64`     |       玩家角色卡缓存角色数量上限          |
 |      `skland__gacha_render_max`      |  否   |    `30`     | 明日方舟抽卡记录单图渲染上限（单位:卡池） |
 |    `skland__ef_gacha_render_max`     |  否   |     `5`     |      终末地抽卡记录单图渲染卡池上限       |
 |     `skland__roster_render_max`     |  否   |    `16`     |      方舟干员单图渲染数量上限       |
 |  `skland__roster_render_timeout`   |  否   |  `180000`   |      方舟干员截图超时时间（毫秒）       |
+|   `skland__roster_render_format`   |  否   |  `"jpeg"`  |       方舟干员图片格式：`png` / `jpeg`       |
+|    `skland__roster_jpeg_quality`    |  否   |    `90`     |        方舟干员 JPEG 质量（1-100）         |
 
 > [!TIP]
 > 以上配置项均~~没什么用~~按需填写，GitHub Token 用于解决 fetch_file_list 接口到达免费调用上限，但不会有那么频繁的更新频率，99.98%的概率是用不上的。~~只是因为我开发测试的时候上限了，所以有了这项~~,
 >
-> 本插件所使用的`干员半身像`、`技能图标`等资源，均优先调用本地，不存在则从网络请求获取，所以本地资源更新非必要选项，按需填写，不想过多请求网络资源可以自动或指令手动更新下载本地资源。
+> 本插件所使用的`干员半身像`、`技能图标`等资源均优先调用本地，不存在时从网络请求。开启 `skland__ark_portrait_cache_enabled` 后，首次渲染仍直接使用远程方舟干员或皮肤半身图；Chromium 加载成功后会将该响应写入本地缓存，后续渲染优先读取本地。该过程不会额外请求图片或重新生成 HTML，接口直接返回的图片链接仍由浏览器访问。方舟干员页面会显式等待字体及全部图片完成加载和解码后截图，不再等待每页进入 `networkidle`；远程背景也会加入该等待。方舟干员默认输出 JPEG 90，可通过配置切回 PNG。全量资源更新仍为可选项。
 
 ### background_source
 

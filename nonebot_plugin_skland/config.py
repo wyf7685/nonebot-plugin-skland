@@ -62,6 +62,8 @@ class ScopedConfig(BaseModel):
     """GitHub Token"""
     check_res_update: bool = False
     """启动时检查资源更新"""
+    ark_portrait_cache_enabled: bool = False
+    """Cache deterministic Arknights portrait images after first render."""
     background_source: Literal["default", "Lolicon", "random"] | CustomSource = "default"
     """背景图片来源"""
     endfield_background_simple: bool = False
@@ -70,6 +72,10 @@ class ScopedConfig(BaseModel):
     """Rogue 战绩查询背景图片来源"""
     argot_expire: int = 300
     """Argot 缓存过期时间"""
+    ark_card_cache_ttl: int = Field(default=120, gt=0)
+    """ArkCard cache TTL in seconds."""
+    ark_card_cache_max_entries: int = Field(default=64, gt=0)
+    """Maximum ArkCard cache entries."""
     gacha_render_max: int = 30
     """抽卡记录单图渲染上限"""
     ef_gacha_render_max: int = 5
@@ -78,6 +84,10 @@ class ScopedConfig(BaseModel):
     """Maximum operators rendered in one roster image."""
     roster_render_timeout: int = Field(default=180_000, gt=0)
     """Operator roster screenshot timeout in milliseconds."""
+    roster_render_format: Literal["png", "jpeg"] = "jpeg"
+    """Operator roster image format."""
+    roster_jpeg_quality: int = Field(default=90, ge=1, le=100)
+    """Operator roster JPEG quality."""
 
 
 class Config(BaseModel):
