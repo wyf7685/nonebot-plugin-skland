@@ -107,9 +107,9 @@
     <img class="absolute inset-0 z-0 size-full object-cover" src="{{ card.portrait }}" alt="{{ card.name }}" />
   </div>
 
-  <div class="relative -mt-[9px] flex min-h-[42px] items-end justify-end py-[2px] pr-1 pl-[44px]">
+  <div class="relative -mt-[9px] flex min-h-[42px] items-end justify-end px-1 py-[2px]">
     <div class="absolute h-full inset-0 z-1 bg-[#1B1B1B]/80"></div>
-    <div class="relative z-[8] max-h-10 overflow-hidden text-right font-[Akrobat] leading-5 font-bold text-white [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [text-shadow:0_1px_4px_#000] break-all{% if card.name|length > 6 %} text-[13px]{% else %} text-base{% endif %}">
+    <div class="relative z-[8] w-full max-h-10 overflow-hidden text-right font-[Akrobat] leading-5 font-bold text-white [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [text-shadow:0_1px_4px_#000]{% if card.name|length > 6 %} break-all text-[13px]{% else %} whitespace-nowrap text-base{% endif %}">
       {{ card.name }}
     </div>
   </div>
@@ -133,7 +133,7 @@
   {% endif %}
 
   {% if card.owned and (card.elite or card.level_text) %}
-  <div class="absolute bottom-[31px] left-[7px] z-[7] h-[79px] w-[38px]">
+  <div class="absolute bottom-[42px] left-[7px] z-[7] h-[79px] w-[38px]">
     {% if card.elite %}
     <img class="absolute top-0 left-0 h-[31px] w-[38px] object-contain" src="{{ card.elite }}" alt="" />
     {% endif %}
