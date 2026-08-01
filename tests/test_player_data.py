@@ -2,6 +2,7 @@
 
 import asyncio
 from typing import Any
+from types import SimpleNamespace
 
 import pytest
 
@@ -524,6 +525,80 @@ async def test_gacha_handler_uses_shared_ark_card_data_source(app, mocker):
 
     get_card.assert_awaited_once_with(user, character)
     session.commit.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_gacha_handler_renders_after_session_commit(app, mocker):
+    from nonebot_plugin_orm import get_session
+    from nonebot_plugin_htmlrender.data_source import template_to_html
+
+    import nonebot_plugin_skland.render as render
+    import nonebot_plugin_skland.commands.gacha as gacha
+    from nonebot_plugin_skland.model import SkUser, Character
+
+    rendered_html: list[str] = []
+
+    async def render_template(**kwargs) -> bytes:
+        html = await template_to_html(
+            template_path=kwargs["template_path"],
+            template_name=kwargs["template_name"],
+            filters=kwargs["filters"],
+            **kwargs["templates"],
+        )
+        rendered_html.append(html)
+        return b"image"
+
+    mocker.patch.object(render, "template_to_pic", new=render_template)
+    mocker.patch.object(gacha, "send_reaction")
+    mocker.patch.object(gacha.SklandLoginAPI, "get_grant_code", new=mocker.AsyncMock(return_value="grant"))
+    mocker.patch.object(gacha.SklandLoginAPI, "get_role_token_by_uid", new=mocker.AsyncMock(return_value="role"))
+    mocker.patch.object(gacha.SklandLoginAPI, "get_ak_cookie", new=mocker.AsyncMock(return_value="cookie"))
+    mocker.patch.object(gacha.SklandAPI, "get_gacha_categories", new=mocker.AsyncMock(return_value=[]))
+    mocker.patch.object(
+        gacha,
+        "get_ark_card",
+        new=mocker.AsyncMock(
+            return_value=SimpleNamespace(
+                status=SimpleNamespace(avatar=SimpleNamespace(url="avatar"), level=120),
+            )
+        ),
+    )
+    message = SimpleNamespace(send=mocker.AsyncMock())
+    mocker.patch.object(gacha.UniMessage, "image", return_value=message)
+
+    async with get_session() as session:
+        user = SkUser(
+            id=91001,
+            access_token="access-token",
+            cred="cred",
+            cred_token="cred-token",
+            user_id="skland-user",
+        )
+        character = Character(
+            id=user.id,
+            uid="role-1",
+            role_id="role-1",
+            app_code="arknights",
+            channel_master_id="1",
+            nickname="Doctor",
+            isdefault=True,
+        )
+        user_id = user.id
+        session.add_all([user, character])
+        await session.commit()
+
+        await gacha.gacha_handler(
+            user_session=SimpleNamespace(user_id=user_id),
+            session=session,
+            begin=mocker.Mock(available=False),
+            limit=mocker.Mock(available=False),
+            target=mocker.Mock(available=False),
+            bot=SimpleNamespace(self_id="bot"),
+        )
+
+    assert len(rendered_html) == 1
+    assert "Doctor" in rendered_html[0]
+    message.send.assert_awaited_once_with()
 
 
 @pytest.mark.asyncio

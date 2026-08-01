@@ -172,14 +172,20 @@ async def render_clue_board(props: Clue):
 
 
 async def render_gacha_history(
-    props: GroupedGachaRecord, char: Character, status: Status, begin: int | None = None, limit: int | None = None
+    props: GroupedGachaRecord,
+    status: Status,
+    nickname: str,
+    channel_master_id: str,
+    begin: int | None = None,
+    limit: int | None = None,
 ) -> bytes:
     return await template_to_pic(
         template_path=str(TEMPLATES_DIR),
         template_name="gacha.html.jinja2",
         templates={
             "record": props,
-            "character": char,
+            "nickname": nickname,
+            "channel_master_id": channel_master_id,
             "status": status,
             "start_index": begin,
             "end_index": limit,

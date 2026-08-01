@@ -97,6 +97,8 @@ async def gacha_handler(
     all_gacha_records = records + record_to_save
 
     gacha_data_grouped = group_gacha_records(all_gacha_records)
+    character_nickname = character.nickname
+    character_channel_master_id = character.channel_master_id
     user_info = await get_ark_card(user, character)
     await session.commit()
     if not user_info:
@@ -111,7 +113,12 @@ async def gacha_handler(
             async def render(index: int) -> bytes:
                 async with render_semaphore:
                     return await render_gacha_history(
-                        gacha_data_grouped, character, user_info.status, index, index + config.gacha_render_max
+                        gacha_data_grouped,
+                        user_info.status,
+                        nickname=character_nickname,
+                        channel_master_id=character_channel_master_id,
+                        begin=index,
+                        limit=index + config.gacha_render_max,
                     )
 
             imgs = await asyncio.gather(
@@ -137,7 +144,7 @@ async def gacha_handler(
                 nodes.append(
                     CustomNode(
                         bot.self_id,
-                        f"{character.nickname} | {start_id}-{end_id}",
+                        f"{character_nickname} | {start_id}-{end_id}",
                         UniMessage.image(raw=content),
                     )
                 )
@@ -156,13 +163,25 @@ async def gacha_handler(
                 config.gacha_render_max,
             ):
                 img = await render_gacha_history(
-                    gacha_data_grouped, character, user_info.status, i, i + config.gacha_render_max
+                    gacha_data_grouped,
+                    user_info.status,
+                    nickname=character_nickname,
+                    channel_master_id=character_channel_master_id,
+                    begin=i,
+                    limit=i + config.gacha_render_max,
                 )
                 tasks.append(asyncio.create_task(send(img)))
             await asyncio.gather(*tasks)
     else:
         await UniMessage.image(
-            raw=await render_gacha_history(gacha_data_grouped, character, user_info.status, gacha_begin, gacha_limit)
+            raw=await render_gacha_history(
+                gacha_data_grouped,
+                user_info.status,
+                nickname=character_nickname,
+                channel_master_id=character_channel_master_id,
+                begin=gacha_begin,
+                limit=gacha_limit,
+            )
         ).send()
     send_reaction(user_session, "done")
     session.add_all(record_to_save)
