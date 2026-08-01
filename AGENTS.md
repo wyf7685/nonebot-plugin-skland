@@ -257,6 +257,12 @@ class Config(BaseModel):
 - `LoginException` 通常表示 `cred` 失效，若有 `access_token`，通过 grant code 重新获取 cred。
 
 
+### 二维码绑定
+
+- `commands/bind.py` 使用 `UserSession.platform_user.avatar` 获取命令发起者头像；只下载 HTTP(S) 图片，并限制响应类型、大小与像素数量，获取失败时自动降级为无头像卡片，不影响扫码登录。
+- 登录二维码保持原生黑白点阵、M 级纠错和 4 模块静区，不做缩放或头像覆盖；Pillow 只在二维码外合成模糊头像背景、暗色遮罩、白色面板与圆形头像徽标。
+- 群聊发送时回复原消息并 @ 发起者，私聊不添加无意义的 @；二维码仍在约 100 秒后撤回，后续扫码轮询与账号绑定流程不变。
+
 ### 玩家角色卡短期缓存
 
 - `player_data.py` 的 `ArkCardDataSource` 为 `commands/card.py`、`commands/box.py` 和 `commands/gacha.py` 统一缓存无副作用的 `ArkCard` API 读取；`get_ark_card()` 在每个命令请求上下文独立执行 token 刷新。
@@ -385,6 +391,7 @@ uv run pytest -s tests/test_skland_api.py
 - `tests/test_ef_gacha_joint_pool.py` 覆盖终末地联合寻访分类、统计与模板渲染相关行为。
 - `tests/test_operator_roster.py` 覆盖官方目录与 PRTS 元数据合并、自然筛选词、高级参数合并、快捷指令空格约束、持有状态/潜能组合、实装/获取/练度排序、技能/模组组合、JPEG/PNG 参数、分页发送与渲染参数。
 - `tests/test_image_cache.py` 覆盖配置开关、单次模板生成、浏览器半身图响应落盘、本地复用、显式字体/图片就绪、等待超时、未知 URL 跳过与失败响应忽略。
+- `tests/test_qrcode.py` 覆盖头像 URL 限制、图片下载校验、无头像降级、二维码原始像素保持、群聊发起者标记及扫码绑定流程。
 - `tests/test_skland_api.py` 会调用真实接口；单独运行时使用 `uv run pytest -s tests/test_skland_api.py`，其中 `-s` 用于显示终端二维码输出；凭证优先级为：
   1. `tests/cred_cache.json`
   2. 环境变量 `SKLAND_TOKEN` 或 `SKLAND_CRED`
